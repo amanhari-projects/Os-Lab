@@ -1,0 +1,129 @@
+print "---proc_manager--";
+
+alias funcnum R2;
+if(funcnum==2)  then
+    alias userpg R4;
+    userpg = [PROCESS_TABLE+(R1*16)+11];
+    multipush(R1,R2,R3,R4);
+    R2 = 2;                 //R1 = pid R2 = funcnum R3 = page num
+    R3 = userpg;
+    call MEMORY_MANAGER;
+    multipop(R1,R2,R3,R4);
+    return;
+
+else 
+    if(funcnum==3) then
+        multipush(R1,R2,R3);
+        funcnum = 4;                //free page table
+        call PROCESS_MANAGER;
+        multipop(R1,R2,R3);
+
+        multipush(R1,R2,R3);
+        funcnum = 2;                //free user area table
+        call PROCESS_MANAGER;
+        multipop(R1,R2,R3);
+
+        [PROCESS_TABLE+(R1*16)+4] = TERMINATED;
+        if([PROCESS_TABLE+(R1*16)+9]!=9)    then
+            alias count R4;
+            count=0;
+            while(count<MAX_PROC_NUM)   do
+                if([PROCESS_TABLE+count*16+4]==WAIT_PROCESS && [PROCESS_TABLE+count*16+5]==R1)   then
+                    [PROCESS_TABLE+count*16+4]=READY;
+                endif;
+                if([PROCESS_TABLE+count*16+2] == R1)    then
+                    [PROCESS_TABLE+count*16+2]=-1;
+                endif;
+            count=count+1;
+            endwhile;
+        endif;
+        return;
+
+    else 
+        if(funcnum==4) then
+            alias pgtb R4;
+            alias pgtl R5;
+            alias val R6;
+
+            pgtb = [PROCESS_TABLE+(R1*16)+14];
+            pgtl = [PROCESS_TABLE+(R1*16)+15];
+            val = 4;
+
+            //explicitly removing library
+            [pgtb+0] = -1;
+            [pgtb+1] = "0000";
+            [pgtb+2] = -1;
+            [pgtb+3] = "0000";
+
+            while(val<(pgtl*2)) do
+                if([pgtb+val]!=-1)  then
+                    multipush(R1,R2,R3,R4,R5,R6);
+                    R2 = 2;
+                    R3 = [pgtb+val];
+                    call MEMORY_MANAGER;
+                    multipop(R1,R2,R3,R4,R5,R6);
+                    [pgtb+val] = -1;
+                    [pgtb+val+1] = "0000";
+                    //breakpoint;
+                endif;
+                val=val+2;
+            endwhile;
+            print "ret proc";
+            breakpoint;
+            if([DISK_MAP_TABLE+R1*10+2]!=-1)    then
+                multipush(R1,R2,R3);
+                R2 = 4;
+                R3 = [DISK_MAP_TABLE+R1*10+2];
+                call MEMORY_MANAGER;
+                multipop(R1,R2,R3);
+            endif;
+            if([DISK_MAP_TABLE+R1*10+3]!=-1)    then
+                multipush(R1,R2,R3);
+                R2 = 4;
+                R3 = [DISK_MAP_TABLE+R1*10+2];
+                call MEMORY_MANAGER;
+                multipop(R1,R2,R3);
+            endif;
+            if([DISK_MAP_TABLE+R1*10+8]!=-1)    then
+                multipush(R1,R2,R3);
+                R2 = 4;
+                R3 = [DISK_MAP_TABLE+R1*10+2];
+                call MEMORY_MANAGER;
+                multipop(R1,R2,R3);
+            endif;
+            if([DISK_MAP_TABLE+R1*10+9]!=-1)    then
+                multipush(R1,R2,R3);
+                R2 = 4;
+                R3 = [DISK_MAP_TABLE+R1*10+2];
+                call MEMORY_MANAGER;
+                multipop(R1,R2,R3);
+            endif;
+            return;
+        else    
+            if(funcnum==1)    then
+                alias val R4;
+                val = 0;
+
+                while(val<MAX_PROC_NUM) do
+                    if([PROCESS_TABLE+(val*16)+4]==TERMINATED)  then
+                        break;
+                    endif;
+                val=val+1;
+                endwhile;
+                if(val==MAX_PROC_NUM)   then
+                    R0 = -1;
+                    return;
+                endif;
+                [PROCESS_TABLE+(val*16)+4] = ALLOCATED;
+                [PROCESS_TABLE+(val*16)+1] = val;
+                [PROCESS_TABLE+(val*16)+14] = PAGE_TABLE_BASE+(val*20);
+                [PROCESS_TABLE+(val*16)+15] = 10;
+
+                PTBR = PAGE_TABLE_BASE+(val*20);
+                PTLR = 10;
+                R0 = val;
+                return;
+endif;
+endif;
+endif;
+endif;

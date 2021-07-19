@@ -1,0 +1,70 @@
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 11;  //mode flag
+
+alias usersp R5;
+usersp = SP;
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13]=SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+alias sysnum R6;
+sysnum = [[PTBR + (2*((usersp-5)/512))]*512+((usersp-5)%512)];
+
+if(sysnum==11)  then
+    alias ret R7;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+1];
+else if(sysnum==12) then
+    alias ret R7;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+2];
+else if(sysnum==13) then
+    alias wpid R7;
+    [PROCESS_TABLE+(SYSTEM_STATUS_TABLE+1)*16+9] = 13;  //mode flag
+    wpid = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];
+    if(wpid<0 || wpid>15)   then
+        wpid = -1;
+    else if(wpid==[SYSTEM_STATUS_TABLE+1])  then
+        wpid = -1;
+    else if([PROCESS_TABLE+wpid*16+4]==TERMINATED)   then
+        wpid = -1;
+    endif;
+    endif;
+    endif;
+    if(wpid==-1)    then
+        [[PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512)]=-1;
+        [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 0;
+        SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+        ireturn;
+    endif;
+    [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+4]=WAIT_PROCESS;
+    [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+4]=wpid;
+    multipush(R0,R1,R2,R3,R4,R5,R6,R7);
+    call MOD_5;
+    multipop(R0,R1,R2,R3,R4,R5,R6,R7);
+    [[PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512)]=0;
+    [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 0;
+    SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+    ireturn;
+else if(sysnum==14) then
+    [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 14;
+    alias count R7;
+    alias curpid R8;
+    count = 0;
+    curpid = [SYSTEM_STATUS_TABLE+1];
+    while(count<MAX_PROC_NUM)   do
+        if([PROCESS_TABLE+count*16+4]==WAIT_PROCESS && [PROCESS_TABLE+count*16+5]==curpid)   then
+            [PROCESS_TABLE+count*16+4]=READY;
+        endif;
+        count=count+1;
+    endwhile;
+    [[PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512)]=0;
+    [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 0;
+    SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+    ireturn;
+endif;
+endif;
+endif;
+endif;
+
+[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9] = 0;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+ireturn;

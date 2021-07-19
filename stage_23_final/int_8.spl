@@ -1,0 +1,171 @@
+print "int 8 fork";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 8;     //mode flag
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+//get pcb function
+R1 = [SYSTEM_STATUS_TABLE+1];
+R2 = 1;
+call PROCESS_MANAGER;
+alias newpid R10;
+newpid = R0;
+//print R0;
+alias psys R12;
+alias pnew R13;
+breakpoint;
+psys = PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16);
+if(R0==-1)  then
+    alias usersp R3;
+    usersp = [psys+13];
+    alias ret R2;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = -1;
+    SP = [psys+13];
+    [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 0;     //mode flag
+    //print "r int8 1";
+    ireturn;
+endif;
+
+//allocating the heap if parent doesnt have
+alias ptb R3;   
+ptb = [PROCESS_TABLE+(newpid*16+14)];
+if([PTBR+4]==-1) then
+    multipush(R1,R3,R10,R12,R13);
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 1;
+    call MEMORY_MANAGER;
+    [PTBR+4] = R0;
+    [PTBR+5] = "1110";
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 1;
+    call MEMORY_MANAGER;
+    [PTBR+6] = R0;
+    [PTBR+7] = "1110";
+    multipop(R1,R3,R10,R12,R13);
+endif;
+
+breakpoint;
+alias val R4;
+alias count R5;
+count = 16;
+val = 0;
+while(val<3)    do
+    
+    if(val==2)  then
+        multipush(R1,R2,R3,R4,R5,R10,R12,R13);
+        R1 = [SYSTEM_STATUS_TABLE+1];
+        R2 = 1;
+        call MEMORY_MANAGER;
+        multipop(R1,R2,R3,R4,R5,R10,R12,R13);
+        [PROCESS_TABLE+(newpid*16)+11] = R0;    //alloting user area page
+    else
+        multipush(R1,R2,R3,R4,R5,R10,R12,R13);
+        R1 = [SYSTEM_STATUS_TABLE+1];
+        R2 = 1;
+        breakpoint;
+        call MEMORY_MANAGER;
+        multipop(R1,R2,R3,R4,R5,R10,R12,R13);
+        [ptb+count] = R0;                      //alloting the stck for child
+        [ptb+count+1] = "0110";
+        count=count+2;
+   endif;
+    val=val+1;
+endwhile;
+
+alias val1 R5;
+alias val2 R6;
+
+val1 = PROCESS_TABLE+(newpid*16);
+val2 = psys;
+//setting up the childs table 
+[val1+3] = [val2+3]; //userid
+[val1+6] = [val2+6]; //swap flg
+[val1+10] = [val2+10]; //swp sts
+[val1+7] = [val2+7]; //INODE INDEX
+[val1+13] = [val2+13];
+[val1+0] = 0;  //TICK
+[val1+12] = 0; //KPTR
+[val1+9] = 0;  //MODE 
+[val1+2] = [SYSTEM_STATUS_TABLE+1];
+[val1+4] = CREATED;
+
+alias count R7;
+
+//----per process table copying ------>
+count = 1;
+val1 = [PROCESS_TABLE+(newpid*16)+11]+1;
+val2 = [psys+11]+1;
+alias tr R14;
+while(count<17) do
+    [val1*512-count]=[val2*512-count];
+    if(count%2!=0)  then
+        if([val2*512-count]==SEMAPHORE)     then
+            tr = [val2*512-count+1];
+            [SEMAPHORE_TABLE+tr*4+1] = [SEMAPHORE_TABLE+tr*4+1]+1;
+    endif;
+    endif;
+    count=count+1;
+endwhile;
+
+//-----disk status table---->
+val1 = DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10;
+val2 = DISK_MAP_TABLE + newpid*10;
+count = 2;
+while(count<10) do
+    [val2+count] = [val1+count];
+    count=count+1;
+endwhile;
+print "--ditched--";
+breakpoint;
+//copying heap,code and library to child
+val1 = [psys+14];
+count = 0;
+alias temp R11;
+while(count<16) do
+    [ptb+count]=[val1+count];
+    if(count%2==0)   then
+        temp = MEMORY_FREE_LIST+[ptb+count];
+        [temp] = [temp]+1;
+    endif;
+    count=count+1;
+endwhile;
+
+
+//----user stack copying-->
+val1 = [psys+14];
+val1 = [val1+16]*512;
+val2 = [ptb+16]*512;
+count=0;
+while(count<(512))    do
+    [val2+count]=[val1+count];
+    count=count+1;
+endwhile;
+
+val1 = [psys+14];
+val1 = [val1+18]*512;
+val2 = [ptb+18]*512;
+count=0;
+while(count<(512))    do
+    [val2+count]=[val1+count];
+    count=count+1;
+endwhile;
+
+[[PROCESS_TABLE+(newpid*16)+11]*512] = BP;
+
+alias usersp R8;
+alias ret R9;
+
+usersp = [PROCESS_TABLE+(newpid*16)+13];
+ret = [ptb + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+[ret] = 0;
+
+//PTBR = PAGE_TABLE_BASE+([SYSTEM_STATUS_TABLE+1]*20);
+usersp = [psys+13];
+ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+[ret] = R10;
+
+SP = [psys+13];
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 0;     //mode flag
+//print "--4--";
+breakpoint;
+ireturn;

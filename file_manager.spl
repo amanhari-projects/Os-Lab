@@ -1,0 +1,137 @@
+print "file mgr";
+// R0 return value
+// R1 pid
+// R2 funcion number
+// R3 argument
+
+if(R2 == 3) then    //open
+    alias filename R3;
+    alias count R4;
+    count=0;
+    while(count<MAX_FILE_NUM)   do
+        if([INODE_TABLE+16*count+1]==filename)  then
+            break;
+        endif;
+    endwhile;
+    if(count==MAX_FILE_NUM) then
+        R0 = -1;
+        return;
+    endif;
+
+    multipush(R1,R2,R3,R4);     //acquire inode resource
+    R2 = R1;
+    R1 = 4;
+    R3 = count;
+    call MOD_0;
+    multipop(R1,R2,R3,R4);
+
+    if([INODE_TABLE+16*count]!=DATA)    then
+        multipush(R1,R2,R3,R4);     //release inode resource
+        R2 = R1;
+        R1 = 5;
+        R3 = count;
+        call MOD_0;
+        multipop(R1,R2,R3,R4);
+        R0 = -1;
+        return;
+    endif;
+
+    alias opencount R5;
+    opencount=0;
+    while(opencount<MAX_OPENFILE_NUM)   do
+        if([OPEN_FILE_TABLE+4*opencount]==-1)   then
+            break;
+        endif;
+        opencount=opencount+1;
+    endwhile;
+    if(opencount==MAX_OPENFILE_NUM) then
+        R0 = -2;
+        return;
+    endif;
+
+    if(filename=="root")    then
+        [OPEN_FILE_TABLE+4*opencount]=INODE_ROOT;
+    else
+        if([FILE_STATUS_TABLE+4*count+1]==-1)   then
+           [FILE_STATUS_TABLE+4*count+1]=1;
+        else
+            [FILE_STATUS_TABLE+4*count+1]=[FILE_STATUS_TABLE+4*count+1]+1;
+        endif;
+        [OPEN_FILE_TABLE+4*opencount]=count;
+    endif;
+
+    [OPEN_FILE_TABLE+4*opencount+1] = 1;    //OPEN COUNT
+    [OPEN_FILE_TABLE+4*opencount+2] = 0;    //LSEEK
+
+    multipush(R1,R2,R3,R4,R5);     //release inode resource
+        R2 = R1;
+        R1 = 5;
+        R3 = count;
+        call MOD_0;
+        multipop(R1,R2,R3,R4,R5);
+        R0 = R5;
+        return;
+endif;
+
+if(R2 == 4) then        //close
+    alias filindx R3;
+    alias inodeindx R4;
+    alias filt R5;
+    filt = OPEN_FILE_TABLE+4*filindx;
+    inodeindx = [filt];
+    [filt+1] = [filt+1]-1;
+
+    if([filt+1]==0)    then
+        [filt]=-1;
+        [filt+1] =-1;
+        [filt+2] =-1;
+        if(inodeindx!=INODE_ROOT)   then
+            [FILE_STATUS_TABLE+4*inodeindx+1]=[FILE_STATUS_TABLE+4*inodeindx+1]-1;
+            if([FILE_STATUS_TABLE+4*count+1]==-1)   then
+                [FILE_STATUS_TABLE+4*count+1]=-1;
+            endif;
+        endif;
+    endif;
+    return;
+endif;
+if(R2 == 1) then        //write
+
+endif;
+if(R2 == 2) then        //read.......<-disk block->R3.....<-offset->R4...<-memory->R5
+    alias bufnum R6;
+    bufnum = R3%4;
+    multipush(R1,R2,R3,R4,R5,R6);   //acquire the buffer
+    R2=R1;
+    R2=1;
+    R3=bufnum;
+    call MOD_0;
+    multipop(R1,R2,R3,R4,R5,R6);
+    alias buftbl R7;
+    buftbl = BUFFER_TABLE+4*bufnum;
+    if([buftbl]!=R3)    then
+        if([buftbl+1]==1)   then
+            multipush(R1,R2,R3,R4,R5,R6,R7);
+            R2 = R1;
+            R1 = 1;
+            R3 = [buftbl];
+            R4 = bufnum+71;
+            call MOD_4;             //since dirty bit is set store the value
+            multipop(R1,R2,R3,R4,R5,R6,R7);
+            [buftbl+1]=-1;
+            [buftbl]=-1;
+            buftbl+2]=-1;
+        endif;
+
+        //---load the disk block to buffer table
+        multipush(R1,R2,R3,R4,R5,R6,R7);
+        R2 = R1;
+        R1 = 2;
+        R4 = bufnum+71;
+        R5 = R3;
+        call MOD_4;             //since dirty bit is set store the value
+        multipop(R1,R2,R3,R4,R5,R6,R7);
+
+        [buftbl]=R3;
+    endif;
+    
+endif;

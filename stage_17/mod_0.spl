@@ -1,0 +1,54 @@
+//<---------resource manager-------->
+print"---resource---";
+breakpoint;
+
+alias funcnum R1;
+alias currentpid R2;
+
+if (funcnum==8) then
+    multipush(R1,R2,R3);
+    alias status R4;
+    status = [TERMINAL_STATUS_TABLE];
+    while(status==1)    do
+        [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+4]=WAIT_TERMINAL;
+        multipush(R1,R2,R3,R4);
+        call MOD_5; 
+        //print"--ret mod 0";
+        //----calling scheduler---->
+        multipop(R1,R2,R3,R4);
+    endwhile;
+    multipop(R1,R2,R3);
+    [TERMINAL_STATUS_TABLE] = 1;
+    [TERMINAL_STATUS_TABLE + 1] = [SYSTEM_STATUS_TABLE + 1];
+    return;
+else
+    if(funcnum==9)  then    
+        alias termpid R4;
+        termpid = [TERMINAL_STATUS_TABLE+1];
+        if(termpid!=currentpid) then    
+            alias ret R0;
+            ret = -1;
+            return;
+        endif;
+        [TERMINAL_STATUS_TABLE]=0;
+        alias val R5;
+        alias stat R6;
+        val=0;
+        while(val!=MAX_PROC_NUM)    do
+            stat = [PROCESS_TABLE+(val*16)+1];
+            if(stat!=-1)    then
+                stat = [PROCESS_TABLE+(val*16)+4];
+                if(stat==WAIT_TERMINAL) then    
+                    [PROCESS_TABLE+(val*16)+4] = READY;
+                endif;
+            endif;
+            val=val+1;
+        endwhile;
+        alias ret R0;
+        ret=0;
+        return;
+    endif;
+endif;
+
+            
+

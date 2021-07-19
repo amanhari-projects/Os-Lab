@@ -1,0 +1,96 @@
+print "int 14";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 14;     //mode flag
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+alias usersp R14;
+usersp = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+alias syscall R5;
+syscall = [[PTBR + (2*((usersp-5)/512))]*512+((usersp-5)%512)];
+
+//---------code reduction variables--------
+alias pten R12;
+pten = PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16);
+alias pret R13;
+pret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+//----------------------------------------
+breakpoint;
+if(syscall==19)     then    //semlock
+    alias semid R6;
+    alias pid R7;
+
+    pid = [pten+11]+1;
+    semid = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];    
+    if(semid>7 || semid<0)  then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+    semid = (semid+1)*2;
+    if([pid*512-semid]!=SEMAPHORE) then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+
+    semid = [pid*512-semid+1];      //----get the sem table id
+    while([SEMAPHORE_TABLE+semid*4]!=-1 && [SEMAPHORE_TABLE+semid*4]!=[SYSTEM_STATUS_TABLE+1])  do
+        [pten+4] =  WAIT_SEMAPHORE;
+        [pten+5] = semid;
+        multipush(R12,R13,R14,R6,R7,R5);
+        call MOD_5;
+        multipop(R12,R13,R14,R6,R7,R5);
+    endwhile;
+    [SEMAPHORE_TABLE+semid*4]=[SYSTEM_STATUS_TABLE+1];
+    [pret] = 0;
+    SP = [pten+13];
+    [pten+9] = 0;
+    ireturn;
+else                    //semrelease
+    alias semid R6;
+    alias pid R7;
+
+    pid = [pten+11]+1;
+    semid = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];    
+    if(semid>7 || semid<0)  then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+    semid = (semid+1)*2;
+    if([pid*512-semid]!=SEMAPHORE) then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+    semid = [pid*512-semid+1];  //semaphore table indx
+    if([SEMAPHORE_TABLE+semid*4]!=-1)   then
+        if([SEMAPHORE_TABLE+semid*4]!=[SYSTEM_STATUS_TABLE+1])  then
+            [pret] = -2;
+            SP = [pten+13];
+            [pten+9] = 0;
+            ireturn;  
+        else
+            [SEMAPHORE_TABLE+semid*4]=-1;
+            alias num R8;
+            num=0;
+            while(num<MAX_PROC_NUM) do
+                if([PROCESS_TABLE+(num*16+4)]==WAIT_SEMAPHORE)  then
+                    if([PROCESS_TABLE+(num*16+5)]==semid)   then
+                        [PROCESS_TABLE+(num*16+4)]=READY;
+                        [PROCESS_TABLE+(num*16+5)]=-1;
+                endif;
+                endif;
+                num = num+1;
+            endwhile;             
+    endif;
+    endif;
+    [pret] = -2;
+    SP = [pten+13];
+    [pten+9] = 0;
+    ireturn; 
+endif;

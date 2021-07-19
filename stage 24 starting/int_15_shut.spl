@@ -1,0 +1,55 @@
+print "==boom==";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 15;     //mode flag
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+
+//----------------------------------------------------
+alias usersp R14;
+usersp = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+alias pret R13;
+pret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+//--------------------------------------------------------
+
+//--------checking if the shutdown is set by root -------->
+if([PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+1]!=1    ||  [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+3]!=1)   then
+    [pret] = -1;
+    [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 0;     //mode flag
+    SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+    ireturn;
+endif;
+
+//<--restoring the......inode table....root file....disk free list---->
+//--------------inode
+multipush(R13,R14);
+R1 = 1;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 3;         //-----------disk
+R4 = 59;        //-----------memory
+call MOD_4;     //device manager
+
+R1 = 1;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 4;         //-----------disk
+R4 = 60;        //-----------memory
+call MOD_4;     //device manager
+multipop(R13,R14);
+
+//--------------root file
+multipush(R13,R14);
+R1 = 1;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 5;         //-----------disk
+R4 = 62;        //-----------memory
+call MOD_4;     //device manager
+multipop(R13,R14);
+
+//-------------disk free list
+multipush(R13,R14);
+R1 = 1;
+R2 = [SYSTEM_STATUS_TABLE+1];
+R3 = 2;         //-----------disk
+R4 = 61;        //-----------memory
+call MOD_4;     //device manager
+multipop(R13,R14);
+
+halt;

@@ -1,0 +1,48 @@
+decl
+    int a[100];
+enddecl
+int main()
+{
+    decl
+        int temp,n,i,j;
+        str msg,fil;
+    enddecl
+    begin
+    breakpoint;
+    n=4;
+    msg="File name:";
+    //temp = exposcall("Write",-2,n);
+    breakpoint;
+    //temp = exposcall("Write",-2,msg);
+    temp = exposcall("Read",-1,fil);
+    temp = exposcall("Exec",fil);
+    i=0;
+    while(i<n)  do
+        temp = exposcall("Read",-1,a[i]);
+        i=i+1;
+    endwhile;
+
+    i=0;
+    while(i<(n-1))  do
+        j=0;
+        while(j<(n-1-i)) do
+            if(a[j]>a[j+1])    then
+                temp = a[j];
+                a[j] = a[j+1];
+                a[j+1] = temp;
+            endif;
+            j=j+1;
+        endwhile;
+        i=i+1;
+    endwhile;
+
+    i = 0;
+    while(i<n)  do
+        temp = exposcall("Write",-2,a[i]);
+        i=i+1;
+    endwhile;
+
+
+    return 0;
+    end
+}

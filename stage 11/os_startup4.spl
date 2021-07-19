@@ -1,0 +1,59 @@
+//<-------loading the data programs-------->
+
+loadi(65,7);        //load the init
+loadi(66,8);
+
+loadi(22,35);       //load the int=10
+loadi(23,36);
+
+loadi(2,15);        //load the exception
+loadi(3,16);
+
+loadi(63,13);       //load the library
+loadi(64,14);
+
+loadi(4,17);        //load timer interupt
+loadi(5,18);
+
+loadi(16,29);       //load the int=7 (write) timer
+loadi(17,30);
+
+//<--------setup the page table for init----->
+
+[PROCESS_TABLE + 1] = 0;        //SETTING UP THE PROCESS TABLE-->PID
+[PROCESS_TABLE + 11] = 80;      //-->USER AREA PAGE
+
+[SYSTEM_STATUS_TABLE + 1] = 0;  //-->SYSTEM PID EXEC
+
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+0] = 63;                  //library
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+[PTBR+4] = 78;                  //heap
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+[PTBR+8] = 65;                  //code
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+[PTBR+16] = 76;                 //stack
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+SP = 8*512;
+[76*512] = [65*512+1];
+breakpoint;
+ireturn;

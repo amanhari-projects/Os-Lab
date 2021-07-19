@@ -1,0 +1,56 @@
+//<----------- loading the data programs --------->
+loadi(69,11);       //load the idle 
+loadi(70,12);
+
+loadi(54,67);       //load the boot module
+loadi(55,68);      
+
+loadi(50,63);       //load the module 5 ie scheduler
+loadi(51,64);
+
+breakpoint;
+SP = 82*512-1;      //setting the stack pointer to user area page
+call BOOT_MODULE;   //calling the boot module
+
+//<--------- setting up the page table for idle after 
+//           returning from the boot module ---------------->
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+0] = -1;                  //library
+[PTBR+1] = "0000";
+[PTBR+2] = -1;
+[PTBR+3] = "0000";
+
+[PTBR+4] = -1;                  //heap
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+[PTBR+8] = 69;                  //code
+[PTBR+9] = "0100";
+[PTBR+10] = 70;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+[PTBR+16] = 81;                 //stack
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+[PROCESS_TABLE + 1] = 0;        //SETTING UP THE PROCESS TABLE-->PID
+[PROCESS_TABLE + 4] = RUNNING;  //SETTING UP THE PROCESS_TABLE-->STATE
+[PROCESS_TABLE + 11] = 82;      //-->USER AREA PAGE
+[PROCESS_TABLE + 12] = 0;       //SETTING UP THE PROCESS_TABLE-->KPTR
+[PROCESS_TABLE + 13] = 8*512;   //SETTING UP THE PROCESS_TABLE-->UPTR
+[PROCESS_TABLE + 14] = PTBR;
+[PROCESS_TABLE + 15] = 10;
+
+[512*81] = [69*512 + 1];        //setting the top of user stack
+SP = 8*512;
+print "pling";
+ireturn;

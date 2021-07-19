@@ -1,0 +1,115 @@
+print "--exhandle--";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+multipush(EIP);
+backup;
+breakpoint;
+if([PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13]==(PTLR*512-1))   then
+    print "stck ovrflw";
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 3;
+    call PROCESS_MANAGER;
+    call MOD_5;
+    halt;
+endif;
+if(EC==1)   then
+    print "ill instr";
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 3;
+    call PROCESS_MANAGER;
+    call MOD_5;
+    halt;
+else if(EC==2)   then
+    print "ill mem";
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 3;
+    call PROCESS_MANAGER;
+    call MOD_5;
+    halt;
+else if(EC==3)   then
+    print "arth err";
+    R1 = [SYSTEM_STATUS_TABLE+1];
+    R2 = 3;
+    call PROCESS_MANAGER;
+    call MOD_5;
+    halt;
+else if(EC==0)   then
+    breakpoint;
+    if((EPN==2)||(EPN==3))  then
+        alias curpid R1;
+        curpid = [SYSTEM_STATUS_TABLE+1];
+        alias ptb R2;
+        R2 = [PROCESS_TABLE+(curpid*16)+14];
+        curpid = [SYSTEM_STATUS_TABLE+1];
+        multipush(R1,R2);
+        R2=1;
+        call MEMORY_MANAGER;
+        multipop(R1,R2);
+        [R2+4] = R0;
+        [R2+5] = "1110";
+
+        multipush(R1,R2);
+        R2=1;
+        call MEMORY_MANAGER;
+        multipop(R1,R2);
+        [R2+6] = R0;
+        [R2+7] = "1110";
+        breakpoint;
+        restore;
+        multipop(EIP);
+        SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+        SP = SP+1;
+        alias ipret R3;
+        ipret = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+14];
+        ipret = [ipret + (2*SP/512)]*512+(SP%512);
+        [ipret]=EIP;
+        ireturn;
+    else
+        alias curpid R1;
+        curpid = [SYSTEM_STATUS_TABLE+1];
+        alias val R4;
+        val = 5;
+        while(val<8)    do
+            if([DISK_MAP_TABLE+curpid*10+val]!=-1)  then
+                if((val==5)&&([PTBR+10]==-1))  then
+                    break;
+                else if((val==6)&&([PTBR+12]==-1))    then
+                    break;
+                else if((val==7)&&([PTBR+14]==-1))  then
+                    break;
+                endif;
+                endif;
+                endif; 
+            endif;
+            val=val+1;
+        endwhile;
+        multipush(R1,R2,R3,R4);
+        R2 = 5;
+        R3 = [DISK_MAP_TABLE+curpid*10+val];
+        call MEMORY_MANAGER;
+        multipop(R1,R2,R3,R4);
+        if(val==5)  then
+            [PTBR+10] = R0;
+            [PTBR+11] = "1100";
+        else if(val==6)    then
+            [PTBR+12] = R0;
+            [PTBR+13] = "1100";
+        else
+            [PTBR+14] = R0;
+            [PTBR+15] = "1100";
+        endif;
+        endif;
+    endif;
+endif;
+endif;
+endif;
+endif;
+restore;
+multipop(EIP);
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+SP = SP+1;
+alias num R7;
+num = [PTBR+(2*SP/512)]*512+(SP%512);
+[num] = EIP;
+
+ireturn;

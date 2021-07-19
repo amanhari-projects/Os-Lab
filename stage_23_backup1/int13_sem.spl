@@ -1,0 +1,96 @@
+//print "int 13";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 13;     //mode flag
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+alias usersp R14;
+usersp = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+alias syscall R5;
+syscall = [[PTBR + (2*((usersp-5)/512))]*512+((usersp-5)%512)];
+breakpoint;
+//---------code reduction variables--------
+alias pten R12;
+pten = PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16);
+alias pret R13;
+pret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+//----------------------------------------
+
+if(syscall==17) then
+    alias pid R6;
+    pid = [pten+11]+1;
+    alias count R7;
+    count=16;
+    while(count>0)  do
+        if([pid*512-count]==-1) then
+            pid = pid*512-count;
+            break;
+        endif;
+        count=count-2;
+    endwhile;
+    if(count!=0)    then
+        //<----acquire new semaphore--->
+        R1 = 6;                             //funcnum
+        R2 = [SYSTEM_STATUS_TABLE+1];       //pid
+        multipush(R5,R6,R7,R12,R13,R14);
+        call MOD_0;                         //<------resource manager
+        multipop(R5,R6,R7,R12,R13,R14);
+        //print "--shit--";
+        breakpoint;
+        if(R0!=-1)  then
+            [pid] = SEMAPHORE;
+            [pid+1] = R0;
+            //<----return -1 as no process table entry--->
+            [pret]=(count/2)-1;
+            SP = [pten+13];
+            [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 0;
+            ireturn;
+        else
+            //<----return -2 as no semaphore table entry--->
+            [pret]=-2;
+            SP = [pten+13];
+            [pten+9] = 0;
+            ireturn;
+        endif;
+    
+    else
+        //<----return -1 as no process table entry--->
+        [pret]=-1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+else
+    alias semid R6;
+    alias pid R7;
+
+    pid = [pten+11]+1;
+    semid = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];    
+    if(semid>7 || semid<0)  then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+    semid = (semid+1)*2;
+    if([pid*512-semid]!=SEMAPHORE) then
+        [pret] = -1;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+
+    //<----invoking relese semaphore frm resource mod----
+    R1 = 7;                             //funcnum
+    R2 = [SYSTEM_STATUS_TABLE+1];       //pid
+    R3 = semid;                         //semid
+    multipush(R5,R6,R7,R12,R13,R14);
+    call MOD_0;                         //<------resource manager
+    multipop(R5,R6,R7,R12,R13,R14);
+
+    [pid*512-semid] = -1;
+    [pid*512-semid+1] = -1;
+    [pret] = 0;
+    SP = [pten+13];
+    [pten+9] = 0;
+    ireturn;
+endif;

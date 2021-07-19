@@ -1,0 +1,53 @@
+alias curpid R1;
+curpid = [SYSTEM_STATUS_TABLE + 1];
+multipush(BP);
+alias procetbl R2;
+procetbl = curpid*16 + PROCESS_TABLE;
+[procetbl + 12] = SP%512;
+[procetbl + 14] = PTBR;
+[procetbl + 15] = PTLR;
+
+//<----------------deciding the new pid--------------->
+print"--sheduler--";
+breakpoint;
+alias newpid R3;
+while(procetbl!=(MAX_PROC_NUM-1)*16+PROCESS_TABLE)  do
+    procetbl = procetbl + 16;
+    newpid = [procetbl + 1];
+    if([procetbl + 4]==TERMINATED)  then
+        continue;
+    else
+        if(newpid==-1)  then    
+            continue;
+        else 
+            curpid = -2;   
+            break;
+        endif;
+    endif;
+endwhile;
+if(curpid!=-2)  then
+    newpid=0;
+endif;
+//<-----------setting up the new pid datas in process table---->
+
+alias newtable R4;
+newtable = PROCESS_TABLE + 16*newpid;
+SP = [newtable + 11]*512  + [newtable + 12];
+PTBR = [newtable + 14];
+PTLR = [newtable + 15];
+[SYSTEM_STATUS_TABLE + 1] = newpid;
+
+print "--shift pid--";
+breakpoint;
+
+if([newtable + 4] == CREATED)   then
+    BP = [[PROCESS_TABLE+(newpid*16)+11]*512];
+    [newtable + 4] = RUNNING;
+    SP = [newtable+13];
+    [newtable + 9] = 0;
+    ireturn;
+else
+    [newtable + 4] = RUNNING;
+    multipop(BP);
+    return;
+endif;

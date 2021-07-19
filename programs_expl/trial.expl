@@ -1,0 +1,19 @@
+int main()
+{
+    decl
+        int temp,pid;
+    enddecl
+    begin
+        //write("Fork once");
+        pid = exposcall("Fork");
+        write("Fork once");
+        write(pid);
+        if(pid!=-1) then
+        if(pid!=0)  then
+            temp = exposcall ( "Exec","trial.xsm" );
+        endif;
+        endif;
+        breakpoint;
+        return 0;
+    end
+}

@@ -1,0 +1,48 @@
+//<----------device manager-------->
+//print"---manager--";
+breakpoint;
+alias funcnum R1;
+alias curpid R2;
+alias out R3;
+
+if (funcnum==3) then
+
+    //----calling the acquire terminal------>
+    multipush(R1,R2,R3);
+    funcnum = 8;
+    call MOD_0;
+    //print"--ret mod 4 1";
+    multipop(R1,R2,R3);
+
+    print out;
+
+    //----calling the release terminal---->
+    multipush(R1,R2,R3);
+    funcnum = 9;
+    call MOD_0;
+    //print"--ret mod 4 2";
+    multipop(R1,R2,R3);
+    return;
+else 
+    if(funcnum==4) then
+        multipush(R1,R2,R3);
+        funcnum = 8;
+        call MOD_0;
+        //print"--ret mod 4 3";
+        multipop(R1,R2,R3);
+
+        read;
+
+        [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+4] = WAIT_TERMINAL;
+        multipush(R1,R2,R3);
+        call MOD_5;
+        //print"--ret mod 4 4";
+        multipop(R1,R2,R3);
+        alias addr R4;
+        addr = [PTBR + 2*(R3/512)]*512 + (R3%512);
+        [addr] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+8];
+        return;
+    else
+        return;
+    endif;
+endif;

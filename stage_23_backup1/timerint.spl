@@ -1,0 +1,43 @@
+breakpoint;
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+backup;
+alias curpid R0;
+curpid = [SYSTEM_STATUS_TABLE + 1];
+
+alias procetbl R1;
+procetbl = curpid*16 + PROCESS_TABLE;
+
+[procetbl + 12] = SP%512;
+[procetbl + 14] = PTBR;
+[procetbl + 15] = PTLR;
+[procetbl + 4] = READY;
+
+alias newpid R2;
+if(curpid==0) then
+    newpid = 1;
+else
+    newpid = 0;
+endif;
+
+//print "TIMER";
+
+alias newtable R3;
+newtable = PROCESS_TABLE + 16*newpid;
+SP = [newtable + 11]*512  + [newtable + 12];
+PTBR = [newtable + 14];
+PTLR = [newtable + 15];
+
+[SYSTEM_STATUS_TABLE + 1] = newpid;
+
+if([newtable + 4] == CREATED)   then
+    [newtable + 4] = RUNNING;
+    SP = [newtable+13];
+    ireturn;
+else
+    [newtable + 4] = RUNNING;
+    restore;
+    SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+    ireturn;
+endif;
+ireturn;

@@ -1,0 +1,125 @@
+breakpoint;
+print "--exec_int--";
+
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+alias usersp R4;
+usersp = SP;
+
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+//assiging mode flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+9] = INT_EXEC; 
+
+alias filename R5;
+filename = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];
+
+alias indx R6;
+indx = 0;
+
+while(indx<MAX_FILE_NUM) do
+    if([INODE_TABLE+16*indx+1]==filename)    then
+        break;
+    endif;
+    indx=indx+1;
+endwhile;
+
+if(indx==MAX_FILE_NUM)  then
+    alias ret R0;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = -1;
+    SP = usersp;
+    ireturn;
+endif;
+
+alias curpid R1;
+curpid = [SYSTEM_STATUS_TABLE + 1 ];
+alias funcnum R2;
+funcnum = 3;
+multipush(R1,R2,R3,R4,R5,R6);
+call PROCESS_MANAGER;
+multipop(R1,R2,R3,R4,R5,R6);
+
+print "proc mngr exe";
+
+alias usrpage R7;
+usrpage =  [PROCESS_TABLE+(curpid*16)+11];
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE+2] -1;
+[MEMORY_FREE_LIST+usrpage]=[MEMORY_FREE_LIST+usrpage]+1;
+SP = usrpage*512;       //new process user area page
+[PROCESS_TABLE+(curpid*16)+7] = indx;
+[PROCESS_TABLE+(curpid*16)+4] = RUNNING;
+
+PTBR = [PROCESS_TABLE+(curpid*16)+14];
+PTLR = [PROCESS_TABLE+(curpid*16)+15];
+
+[PTBR+0] = 63;                  //library
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+print "----1--";
+[PTBR+4] = -1;                  //heap
+[PTBR+5] = "0000";
+
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+
+multipush(R1,R2,R3,R4,R5,R6,R7);
+R2 = 1;
+call MEMORY_MANAGER;
+[PTBR+16] = R0;                  //stack
+[PTBR+17] = "0110";
+multipop(R1,R2,R3,R4,R5,R6,R7);
+
+multipush(R1,R2,R3,R4,R5,R6,R7);
+R2 = 1;
+call MEMORY_MANAGER;
+[PTBR+18] = R0;
+[PTBR+19] = "0110";
+multipop(R1,R2,R3,R4,R5,R6,R7);
+
+print "----2--";
+breakpoint;
+
+//<---load code page 1---->
+multipush(R1,R2,R3,R4,R5,R6,R7);
+R2 = 5;
+R3 = [INODE_TABLE+16*indx+8];
+call MEMORY_MANAGER;
+[PTBR+8] = R0;
+[PTBR+9] = "0100";
+multipop(R1,R2,R3,R4,R5,R6,R7);
+
+//<---setting disk mp table--->
+[DISK_MAP_TABLE + curpid*10 + 2] = -1;
+[DISK_MAP_TABLE + curpid*10 + 3] = -1;
+[DISK_MAP_TABLE + curpid*10 + 4] = [INODE_TABLE+16*indx+8];
+[DISK_MAP_TABLE + curpid*10 + 5] = [INODE_TABLE+16*indx+9];
+[DISK_MAP_TABLE + curpid*10 + 6] = [INODE_TABLE+16*indx+10];
+[DISK_MAP_TABLE + curpid*10 + 7] = [INODE_TABLE+16*indx+11];
+[DISK_MAP_TABLE + curpid*10 + 8] = -1;
+[DISK_MAP_TABLE + curpid*10 + 9] = -1;
+
+print "----1--";
+breakpoint;
+
+//----the per process table starts from 
+//usersp*512-1 and ends at usersp*512-1-15
+alias ctrl R8;
+alias pctrl R9;
+ctrl = 0;
+pctrl = [PROCESS_TABLE+(curpid*16)+11];
+pctrl = (pctrl+1)*512-1;
+while(ctrl<16)   do
+    [pctrl-ctrl]=-1;
+    ctrl=ctrl+1;
+endwhile;
+[[PTBR+16]*512] = [[PTBR+8]*512+1];
+[PROCESS_TABLE+(curpid*16)+13] = 8*512;
+SP = 8*512;
+ireturn;
+
+
+
+
+

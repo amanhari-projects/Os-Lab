@@ -1,0 +1,62 @@
+print "int 15";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 5;     //mode flag
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+alias usersp R14;
+usersp = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+alias syscall R5;
+syscall = [[PTBR + (2*((usersp-5)/512))]*512+((usersp-5)%512)];
+breakpoint;
+//---------code reduction variables--------
+alias pten R12;
+pten = PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16);
+alias pret R13;
+pret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+//----------------------------------------
+
+if (syscall==2) then
+    [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 2;     //mode flag
+    alias pid R6;
+    pid = [pten+11]+11;
+    alias count R7;
+    count=16;
+    while(count>0)  do
+       if([pid*512-count]==-1) then
+            pid = pid*512-count;
+            break;
+       endif;
+       count=count-2;
+    endwhile; 
+
+    if(count!=0) then
+        //<----acquire the file---->
+        multipush(R5,R6,R12,R13,R14);
+        R1 = [SYSTEM_STATUS_TABLE+1];   //pid
+        R2 = 3;                         //function number open file
+        R3 = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)]; //filename
+        call FILE_MANAGER;
+        multipop(R5,R6,R12,R13,R14);
+
+        if(R0==-1)  then
+           [pret]=-2;       //invalid file table entry
+            SP = [pten+13];
+            [pten+9] = 0;
+            ireturn; 
+        endif;
+
+        [pid]=FILE;
+        [pid+1]=R0;
+        [pret]=(count/2)-1;
+        SP=[pten+13];
+        [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16+9)] = 0;
+        ireturn;
+        
+    else
+        //<----return -3 as no process table entry--->
+        [pret]=-3;
+        SP = [pten+13];
+        [pten+9] = 0;
+        ireturn;
+    endif;
+endif;

@@ -1,0 +1,61 @@
+//print "---proc_manager--"
+
+alias funcnum R2;
+if(funcnum==2)  then
+    alias userpg R4;
+    userpg = [PROCESS_TABLE+(R1*16)+11];
+    multipush(R1,R2,R3,R4);
+    R2 = 2;                 //R1 = pid R2 = funcnum R3 = page num
+    R3 = userpg;
+    call MEMORY_MANAGER;
+    multipop(R1,R2,R3,R4);
+    return;
+
+else if(funcnum==3) then
+        multipush(R1,R2,R3);
+        funcnum = 4;                //free page table
+        call PROCESS_MANAGER;
+        multipop(R1,R2,R3);
+
+        multipush(R1,R2,R3);
+        funcnum = 2;                //free user area table
+        call PROCESS_MANAGER;
+        multipop(R1,R2,R3);
+
+        [PROCESS_TABLE+(R1*16)+4] = TERMINATED;
+        return;
+
+    else if(funcnum==4) then
+            alias pgtb R4;
+            alias pgtl R5;
+            alias val R6;
+
+            pgtb = [PROCESS_TABLE+(R1*16)+14];
+            pgtl = [PROCESS_TABLE+(R1*16)+15];
+            val = 4;
+
+            //explicitly removing library
+            [pgtb+0] = -1;
+            [pgtb+1] = "0000";
+            [pgtb+2] = -1;
+            [pgtb+3] = "0000";
+
+            while(val<(pgtl*2)) do
+                if([pgtb+val]!=-1)  then
+                    multipush(R1,R2,R3,R4,R5,R6);
+                    R2 = 2;
+                    R3 = [pgtb+val];
+                    call MEMORY_MANAGER;
+                    multipop(R1,R2,R3,R4,R5,R6);
+                    [pgtb+val] = -1;
+                    [pgtb+val+1] = "0000";
+                    //breakpoint;
+                endif;
+                val=val+2;
+            endwhile;
+            //print "ret proc";
+            breakpoint;
+            return;
+        endif;
+    endif;
+endif;

@@ -1,0 +1,21 @@
+breakpoint;
+print"--exception--";
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+9]=-1;
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+multipush(EIP);
+backup;
+
+if(EC!=0)   then
+    print "-Exception-";
+    restore;
+    multipop(R0);
+    INT 10;
+
+else
+    if(([PTLR]*512-1)==[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13]) then
+        print "stack overflow";
+    else
+        
+    endif
+endif;

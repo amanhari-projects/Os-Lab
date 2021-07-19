@@ -1,0 +1,18 @@
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+backup;
+alias reqpid R4;
+reqpid = [TERMINAL_STATUS_TABLE+1];
+[PROCESS_TABLE+(reqpid*16)+8] = P0;       //----input buffer transfer
+
+multipush(R4);
+alias funcnum R1;
+funcnum = 9;
+alias rpid R2;
+rpid = reqpid;                              //----current pid is not the req pid
+call MOD_0;                                  //----resource manager module
+//print "--ret console int";
+multipop(R4);
+restore;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+ireturn;

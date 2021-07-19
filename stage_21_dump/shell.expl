@@ -1,0 +1,27 @@
+decl
+    int a[100];
+enddecl
+int main()
+{
+    decl
+        str fil;
+        int temp;
+    enddecl
+    begin
+        while(1==1)  do
+            temp = exposcall("Read",-1,fil);
+            if(fil=="shutdown") then
+                temp = exposcall("Shutdown");
+            else
+                temp = exposcall("Fork");   
+            endif;
+            if(temp == 0)   then
+                temp = exposcall("Exec",fil);
+                if(temp==-1)    then
+                    temp = exposcall("Write",-2,"BAD CMD");
+                endif;
+            endif;
+        endwhile;
+    return 0;
+    end
+}

@@ -1,0 +1,42 @@
+//print "Write Interrupt";
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+9] = 5; 
+//--------->setting up process table mode value to 5 
+alias usersp R0;
+usersp = SP;
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+
+//<-----manually translating address to get the output at (
+//    (user_stack-4)--->
+alias filedecr R1;
+filedecr = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];
+
+if (filedecr!=-2)   then
+    alias ret R2;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = -1;
+else
+    alias outdata R2;
+    alias out R4;
+    outdata = [[PTBR + (2*((usersp-3)/512))]*512+((usersp-3)%512)];
+
+    out = outdata;
+    multipush(R0,R1);
+    alias funcnum R1;
+    funcnum = 3;
+    alias pidcur R2;
+    pidcur = [SYSTEM_STATUS_TABLE + 1];
+    alias data R3;
+    data = out;
+    call MOD_4;
+    //print"--ret write int";
+    multipop(R0,R1);
+
+    alias ret R2;
+    ret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+    [ret] = 0;
+endif;
+SP = usersp;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16+9] = 0; 
+//---------->setting up process table mode value to 5 
+ireturn;

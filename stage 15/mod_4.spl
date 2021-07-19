@@ -1,0 +1,23 @@
+alias funcnum R1;
+alias curpid R2;
+alias out R3;
+
+if (funcnum==3) then
+
+    //----calling the acquire terminal------>
+    multipush(R1,R2,R3);
+    funcnum = 8;
+    call MOD_0;
+    multipop(R1,R2,R3);
+
+    print out;
+
+    //----calling the release terminal---->
+    multipush(R1,R2,R3);
+    funcnum = 9;
+    call MOD_0;
+    multipop(R1,R2,R3);
+    return;
+else
+    return;
+endif;

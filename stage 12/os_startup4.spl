@@ -1,0 +1,108 @@
+//<-------loading the data programs-------->
+
+loadi(65,7);        //load the init
+loadi(66,8);
+
+loadi(22,35);       //load the int=10
+loadi(23,36);
+
+loadi(2,15);        //load the exception
+loadi(3,16);
+
+loadi(63,13);       //load the library
+loadi(64,14);
+
+loadi(4,17);        //load timer interupt
+loadi(5,18);
+
+loadi(16,29);       //load the int=7 (write) timer
+loadi(17,30);
+
+loadi(69,11);       //load the idle 
+loadi(70,12);
+
+//<--------setup the page table and system table for idle--------->
+
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+[PTBR+0] = -1;                  //library
+[PTBR+1] = "0000";
+[PTBR+2] = -1;
+[PTBR+3] = "0000";
+
+[PTBR+4] = -1;                  //heap
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+[PTBR+8] = 69;                  //code
+[PTBR+9] = "0100";
+[PTBR+10] = 70;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+[PTBR+16] = 81;                 //stack
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+
+[PROCESS_TABLE + 1] = 0;        //SETTING UP THE PROCESS TABLE-->PID
+[PROCESS_TABLE + 4] = CREATED;  //SETTING UP THE PROCESS_TABLE-->STATE
+[PROCESS_TABLE + 11] = 82;      //-->USER AREA PAGE
+[PROCESS_TABLE + 12] = 0;       //SETTING UP THE PROCESS_TABLE-->KPTR
+[PROCESS_TABLE + 13] = 8*512;   //SETTING UP THE PROCESS_TABLE-->UPTR
+[PROCESS_TABLE + 14] = PTBR;
+[PROCESS_TABLE + 15] = 10;
+
+[512*81] = [69*512 + 1];
+
+
+//<--------setup the page table and system table for init----->
+
+PTBR = PAGE_TABLE_BASE+20;
+PTLR = 10;
+
+[PTBR+0] = 63;                  //library
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+[PTBR+4] = 78;                  //heap
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+[PTBR+8] = 65;                  //code
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+[PTBR+16] = 76;                 //stack
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+[76*512] = [65*512+1];
+
+
+[PROCESS_TABLE + 16 + 1] = 0;        //SETTING UP THE PROCESS TABLE-->PID
+[PROCESS_TABLE + 16 + 4] = RUNNING;   //SETTING UP THE PROCESS_TABLE-->STATE
+[PROCESS_TABLE + 16 + 11] = 80;      //-->USER AREA PAGE
+[PROCESS_TABLE + 16 + 12] = 0;       //SETTING UP THE PROCESS_TABLE-->KPTR
+[PROCESS_TABLE + 16 + 13] = 8*512;   //SETTING UP THE PROCESS_TABLE-->UPTR
+[PROCESS_TABLE + 16 + 14] = PTBR;
+[PROCESS_TABLE + 16 + 15] = 10;
+
+[SYSTEM_STATUS_TABLE + 1] = 1;  //-->SYSTEM PID EXEC
+SP = 8*512;
+
+ireturn;

@@ -1,0 +1,182 @@
+[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13] = SP;
+alias usersp R4;
+usersp = SP;
+SP = [PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+11]*512-1;
+breakpoint;
+
+//------code reduction variables--------
+alias pret R13;
+pret = [PTBR + (2*((usersp-1)/512))]*512+((usersp-1)%512);
+alias syscall R5;
+syscall = [[PTBR + (2*((usersp-5)/512))]*512+((usersp-5)%512)];
+alias ptable R15;
+ptable = PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16;
+//--------------------------------------
+
+if(syscall==1)  then            //create syscall
+    [ptable+9] = 1; //mode flag
+    alias filname R6;
+    alias per R7;
+    filname = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];
+    per = [[PTBR + (2*((usersp-3)/512))]*512+((usersp-3)%512)];
+
+    alias count R8;
+    count=0;
+    while(count<MAX_FILE_NUM)   do
+        if([INODE_TABLE+16*count+1]==filname)    then
+            break;
+        endif;
+    count = count+1;
+    endwhile;
+    if(count!=MAX_FILE_NUM) then
+        [ptable+9] = 0;
+        SP = [ptable+13];
+        [pret] = 0;
+        ireturn;
+    endif;
+
+    count=0;
+    while(count<MAX_FILE_NUM)   do
+        if([INODE_TABLE+16*count+1]==-1)    then
+            break;
+        endif;
+        count=count+1;
+    endwhile;
+    alias indx R9;
+    indx = INODE_TABLE+16*count;
+    if(count!=MAX_FILE_NUM) then
+        [indx] = DATA;                                               //type of file
+        [indx+1] = filname;                                         //filename
+        [indx+2] = 0;                                                //size of file
+        [indx+3] = [ptable+3];   //userid
+        [indx+4] = per;                                              //permission..0:exclusive...1:not exclusive
+    
+    alias cnt R10;
+    cnt = 8;
+    while(cnt<11)   do
+        [indx+cnt] = -1;  //code pages to -1
+        cnt=cnt+1;
+    endwhile;
+
+        alias rindx R10;
+        rindx = ROOT_FILE+count*8;   
+        [rindx] = [indx+1];
+        [rindx+1] = [indx+2];
+        [rindx+2] = [indx+1];
+        [rindx+3] = [indx+4];
+
+        [ptable+9] = 0;     //mode flag reset
+        SP = [ptable+13];
+        [pret] = 0;
+        ireturn;        
+    endif;
+
+    [ptable+9] = 0;
+    SP = [ptable+13];
+    [pret] = -1;
+    ireturn; 
+else                                //delete syscall
+    [ptable+9] = 4;
+    alias filname R6;
+    filname = [[PTBR + (2*((usersp-4)/512))]*512+((usersp-4)%512)];
+    
+    alias count R7;
+    count=0;
+    while(count<MAX_FILE_NUM)   do
+        if([INODE_TABLE+16*count+1]==filname)    then
+            break;
+        endif;
+        count=count+1;
+    endwhile;
+
+    alias indx R10;
+    indx = INODE_TABLE+16*count;
+
+    if(count==MAX_FILE_NUM) then
+        [ptable+9] = 0;
+        SP = [ptable+13];
+        [pret] = 0;
+        ireturn;
+    else
+        if([indx]!=DATA)    then
+            [ptable+9] = 0;
+            SP = [ptable+13];
+            [pret] = -1;
+            ireturn;
+        endif;
+        if([indx+4]==0) then    //exclusive permission set
+            if([ptable+3]!=[indx+3])    then
+                [ptable+9] = 0;
+                SP = [ptable+13];
+                [pret] = -1;
+                ireturn;
+            endif;
+        endif;
+
+        //----acquire lock on file-------
+        multipush(R4,R5,R6,R7,R10,R13,R15);
+        R1 = 4;
+        R2 = [SYSTEM_STATUS_TABLE+1];
+        R3 = count;
+        call MOD_0;
+        multipop(R4,R5,R6,R7,R10,R13,R15);
+        //===============================
+
+        if([FILE_STATUS_TABLE+count*4+1]!=-1)   then        //file already open
+            //---------release acquired lock---------
+            multipush(R4,R5,R6,R7,R13,R15,R10);
+            R1 = 5;
+            R2 = [SYSTEM_STATUS_TABLE+1];
+            R3 = count;
+            call MOD_0;
+            multipop(R4,R5,R6,R7,R13,R15,R10);
+            //=======================================
+            [ptable+9] = 0;
+            SP = [ptable+13];
+            [pret] = -2;
+            ireturn;
+        endif;
+        
+        alias val R8;
+        val = 8;
+        while(val<12)   do
+            if([indx+val]!=-1)   then
+                alias val2 R9;
+                val2 = [indx+val]%MAX_BUFFER;
+                if([indx+val]==[BUFFER_TABLE+val2*4])    then
+                if([BUFFER_TABLE+val2*4+1]==1)  then
+                    [BUFFER_TABLE+val2*4+1]=0;
+                endif;
+                endif;
+                //--------call release block memory manager---------
+                    multipush(R4,R5,R6,R7,R8,R13,R15,R10);
+                    R1 = [SYSTEM_STATUS_TABLE+1];
+                    R2 = 4;
+                    R3 = [indx+val];
+                    multipop(R4,R5,R6,R7,R8,R13,R15,R10);
+                //==================================================
+            endif;
+            val=val+1;
+        endwhile;
+        [indx] = -1;        //setting up the filename and userid
+        [indx+1] = -1;
+        
+        [ROOT_FILE+8*count] = -1;           //seting to -1 rootfile
+        [ROOT_FILE+8*count+2] = -1;         //filename---file type
+
+        //---------release acquired lock---------
+            multipush(R4,R5,R6,R7,R8,R13,R15,R10);
+            R1 = 5;
+            R2 = [SYSTEM_STATUS_TABLE+1];
+            R3 = count;
+            call MOD_0;
+            multipop(R4,R5,R6,R7,R8,R13,R15,R10);
+        //=======================================
+        [ptable+9] = 0;
+        SP = [ptable+13];
+        [pret] = 0;
+        ireturn;
+        
+    endif;
+
+endif;
